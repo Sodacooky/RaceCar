@@ -5,6 +5,7 @@ random
 windows
 sdl
 sdl_ttf
+sdl_mixer
 */
 #include "pch.h"
 #include "Engine.h"
@@ -52,10 +53,17 @@ bool GraphEngine::Init(void)
 	{
 		return false;
 	}
-	sm_pFont = TTF_OpenFont("C:/Windows/fonts/SIMHEI.TTF", 16);
+	sm_pFont = TTF_OpenFont("C:/Windows/fonts/arial.ttf", 64);
 	if (sm_pFont == nullptr)
 	{
-		return false;
+		//无法打开则提供第二选择，在exe文件夹下的font.ttf文件
+		std::cout << "无法打开C:/Windows/fonts/arial.ttf，正在尝试打开程序目录下的font.ttf..." << std::endl;
+		sm_pFont = TTF_OpenFont("font.ttf", 16);
+		if (sm_pFont == nullptr)
+		{
+			std::cout << "无法打开程序目录下的font.ttf..." << std::endl;
+			return false;
+		}
 	}
 	//done
 	return true;
@@ -79,6 +87,11 @@ void GraphEngine::AddSquareToBuff(int sq_x, int sq_y, GraphUnit* unit, bool bott
 	InBuffGraphUnit ibgu;
 	ibgu.pgu = unit;
 	ibgu.prtDst = new(std::nothrow) SDL_Rect;
+	if (ibgu.prtDst == nullptr)
+	{
+		std::cout << "AddSquareToBuff() failed to allocate mem for ibgu.prtDst" << std::endl;
+		return;
+	}
 	*(ibgu.prtDst) = { sq_x * size,sq_y * size,size,size };
 	if (bottom)
 	{
@@ -101,6 +114,11 @@ void GraphEngine::AddToBuff(int x, int y, int w, int h, GraphUnit* unit)
 	InBuffGraphUnit ibgu;
 	ibgu.pgu = unit;
 	ibgu.prtDst = new(std::nothrow) SDL_Rect;
+	if (ibgu.prtDst == nullptr)
+	{
+		std::cout << "AddSquareToBuff() failed to allocate mem for ibgu.prtDst" << std::endl;
+		return;
+	}
 	*(ibgu.prtDst) = { x * sm_nWinSizeTimes,y * sm_nWinSizeTimes,
 		w * sm_nWinSizeTimes,h * sm_nWinSizeTimes };
 	sm_vec_ibguBuff.push_back(ibgu);
@@ -132,35 +150,100 @@ void GraphEngine::ClearBuff(void)
 	sm_vec_ibguBuff.clear();
 }
 
-GraphUnit* GraphEngine::LoadUnit(const char* filename, bool use_key, SDL_Color key)
+GraphUnit* GraphEngine::LoadUnitFromFile(const char* filename, bool use_key, SDL_Color key)
 {
 	SDL_Surface* sur = SDL_LoadBMP(filename);
 	if (sur == nullptr)
 	{
-		std::cout << SDL_GetError() << std::endl;
+		std::cout << "LoadUnitFromFile() couldn't load file: "
+			<< SDL_GetError() << std::endl;
 		return nullptr;
 	}
-	SDL_SetColorKey(sur, use_key, SDL_MapRGB(sur->format, key.r, key.g, key.b));
 
+	SDL_SetColorKey(sur, use_key, SDL_MapRGB(sur->format, key.r, key.g, key.b));
 	SDL_Texture* tex = SDL_CreateTextureFromSurface(sm_pRen, sur);
-	SDL_FreeSurface(sur);
 	if (tex == nullptr)
 	{
-		std::cout << SDL_GetError() << std::endl;
+		std::cout << "LoadUnitFromFile() failed to create sdl_texture: "
+			<< SDL_GetError() << std::endl;
+		SDL_FreeSurface(sur);
 		return nullptr;
 	}
 
-	auto gu = new(std::nothrow) GraphUnit;//nullptr not worried
-	gu->pTex = tex;
-	gu->prtSrc = nullptr;
+	SDL_FreeSurface(sur);
 
-	return gu;
+	auto pgu = new(std::nothrow) GraphUnit;//nullptr not worried
+	if (pgu == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() couldb't allocate mem for graphunit" << std::endl;
+		SDL_DestroyTexture(tex);
+		return nullptr;
+	}
+	pgu->pTex = tex;
+	pgu->prtSrc = nullptr;
+
+	return pgu;
 }
 
-GraphUnit* GraphEngine::FontsToUnit(SDL_Point* size, const char* ansi_cstr)
+GraphUnit* GraphEngine::LoadUnitFromMem(void* mem, unsigned int mem_size, bool use_key, SDL_Color key)
+{
+	if (mem == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() null mem pointer" << std::endl;
+		return nullptr;
+	}
+
+	SDL_RWops* rw = SDL_RWFromMem(mem, mem_size);
+	if (rw == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() failed read mem" << std::endl;
+		return nullptr;
+	}
+
+	SDL_Surface* sur = SDL_LoadBMP_RW(rw, true);//stream closed?
+	if (sur == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() failed to create sdL_surface: "
+			<< SDL_GetError() << std::endl;
+		return nullptr;
+	}
+
+	SDL_SetColorKey(sur, use_key, SDL_MapRGB(sur->format, key.r, key.g, key.b));
+	SDL_Texture* tex = SDL_CreateTextureFromSurface(sm_pRen, sur);
+	if (tex == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() failed to create sdl_texture: "
+			<< SDL_GetError() << std::endl;
+		SDL_FreeSurface(sur);
+		SDL_RWclose(rw);
+		return nullptr;
+	}
+
+	SDL_FreeSurface(sur);
+	SDL_RWclose(rw);
+
+	auto pgu = new(std::nothrow) GraphUnit;
+	if (pgu == nullptr)
+	{
+		std::cout << "LoadUnitFromMem() couldn't allocate mem for graphunit" << std::endl;
+		SDL_DestroyTexture(tex);
+		return nullptr;
+	}
+	pgu->prtSrc = nullptr;
+	pgu->pTex = tex;
+
+	return pgu;
+}
+
+GraphUnit* GraphEngine::StringToUnit(SDL_Point* size, const char* ansi_cstr)
 {
 	int wcstr_size = MultiByteToWideChar(CP_ACP, 0, ansi_cstr, -1, nullptr, 0);
 	WCHAR* wcstr = new(std::nothrow) WCHAR[wcstr_size];
+	if (wcstr == nullptr)
+	{
+		std::cout << "StringToUnit() couldn't allocate mem for wcstr" << std::endl;
+		return nullptr;
+	}
 	MultiByteToWideChar(CP_ACP, 0, ansi_cstr, -1, wcstr, wcstr_size);
 
 	auto sur = TTF_RenderUNICODE_Solid(sm_pFont, (Uint16*)wcstr, { 255,255,255 });
@@ -168,22 +251,31 @@ GraphUnit* GraphEngine::FontsToUnit(SDL_Point* size, const char* ansi_cstr)
 	SDL_FreeSurface(sur);
 
 	TTF_SizeUNICODE(sm_pFont, (Uint16*)wcstr, &size->x, &size->y);
+	size->x /= 4;
+	size->y /= 4;
 
 	delete[] wcstr;
 
 	auto gu = new(std::nothrow) GraphUnit;
+	if (gu == nullptr)
+	{
+		std::cout << "StringToUnit() couldn't allocate mem for graphunit" << std::endl;
+		SDL_DestroyTexture(tex);
+		return nullptr;
+	}
 	gu->pTex = tex;
 	gu->prtSrc = nullptr;
 
 	return gu;
 }
 
-GraphUnitPack* GraphEngine::LoadUnitPack(const char* filename, bool use_key, SDL_Color key)
+GraphUnitPack* GraphEngine::LoadSqUnitPackFromFile(const char* filename, bool use_key, SDL_Color key)
 {
 	SDL_Surface* sur = SDL_LoadBMP(filename);
 	if (sur == nullptr)
 	{
-		std::cout << SDL_GetError() << std::endl;
+		std::cout << "LoadSqUnitPackFromFile() couldn;t load file: "
+			<< SDL_GetError() << std::endl;
 		return nullptr;
 	}
 	SDL_SetColorKey(sur, use_key, SDL_MapRGB(sur->format, key.r, key.g, key.b));
@@ -191,26 +283,109 @@ GraphUnitPack* GraphEngine::LoadUnitPack(const char* filename, bool use_key, SDL
 	SDL_Texture* tex = SDL_CreateTextureFromSurface(sm_pRen, sur);
 	if (tex == nullptr)
 	{
-		std::cout << SDL_GetError() << std::endl;
+		std::cout << "LoadSqUnitPackFromFile() failed to create sdl_surface"
+			<< SDL_GetError() << std::endl;
 		return nullptr;
 	}
 
-	auto pack = new(std::nothrow) GraphUnitPack;
+	auto pPack = new(std::nothrow) GraphUnitPack;
+	if (pPack == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromFile() failed to allocate mem for graphunitpack" << std::endl;
+		SDL_FreeSurface(sur);
+		SDL_DestroyTexture(tex);
+		return nullptr;
+	}
 
 	for (int y = 0; y != sur->h; y += 16)
 	{
 		for (int x = 0; x != sur->w; x += 16)
 		{
-			auto gu = new(std::nothrow) GraphUnit;
-			gu->pTex = tex;
-			gu->prtSrc = new(std::nothrow) SDL_Rect;
-			*(gu->prtSrc) = { x,y,16,16 };
-			pack->vec_pguContent.push_back(gu);
+			auto pgu = new(std::nothrow) GraphUnit;
+			if (pgu == nullptr)
+			{
+				std::cout
+					<< "LoadSqUnitPackFromFile() failed to allocate mem for graphunit"
+					<< std::endl;
+			}
+			else
+			{
+				pgu->pTex = tex;
+				pgu->prtSrc = new(std::nothrow) SDL_Rect;
+				*(pgu->prtSrc) = { x,y,16,16 };
+				pPack->vec_pguContent.push_back(pgu);
+			}
 		}
 	}
 
 	SDL_FreeSurface(sur);
-	return pack;
+	return pPack;
+}
+
+GraphUnitPack* GraphEngine::LoadSqUnitPackFromMem(void* mem, unsigned int mem_size, bool use_key, SDL_Color key)
+{
+	if (mem == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromMem() null mem pointer" << std::endl;
+		return nullptr;
+	}
+
+	SDL_RWops* rw = SDL_RWFromMem(mem, mem_size);
+	if (rw == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromMem() failed to read mem" << std::endl;
+		return nullptr;
+	}
+
+	SDL_Surface* sur = SDL_LoadBMP_RW(rw, true);//stream closed?
+	if (sur == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromFile() couldn't load file: "
+			<< SDL_GetError() << std::endl;
+		return nullptr;
+	}
+	SDL_SetColorKey(sur, use_key, SDL_MapRGB(sur->format, key.r, key.g, key.b));
+
+	SDL_Texture* tex = SDL_CreateTextureFromSurface(sm_pRen, sur);
+	if (tex == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromFile() failed to create sdl_surface"
+			<< SDL_GetError() << std::endl;
+		return nullptr;
+	}
+
+	auto pPack = new(std::nothrow) GraphUnitPack;
+	if (pPack == nullptr)
+	{
+		std::cout << "LoadSqUnitPackFromFile() failed to allocate mem for graphunitpack" << std::endl;
+		SDL_FreeSurface(sur);
+		SDL_DestroyTexture(tex);
+		return nullptr;
+	}
+
+	for (int y = 0; y != sur->h; y += 16)
+	{
+		for (int x = 0; x != sur->w; x += 16)
+		{
+			auto pgu = new(std::nothrow) GraphUnit;
+			if (pgu == nullptr)
+			{
+				std::cout
+					<< "LoadSqUnitPackFromFile() failed to allocate mem for graphunit"
+					<< std::endl;
+			}
+			else
+			{
+				pgu->pTex = tex;
+				pgu->prtSrc = new(std::nothrow) SDL_Rect;
+				*(pgu->prtSrc) = { x,y,16,16 };
+				pPack->vec_pguContent.push_back(pgu);
+			}
+		}
+	}
+
+	SDL_FreeSurface(sur);
+	return pPack;
 }
 
 void GraphEngine::FreeUnit(GraphUnit* gu)
@@ -260,7 +435,7 @@ void RandomEngine::Init()
 	sm_dre.seed((unsigned int)&sm_dre);
 }
 
-int RandomEngine::Uniform(int min, int max)
+int RandomEngine::UniformRange(int min, int max)
 {
 	std::uniform_int_distribution<int> d(min, max);
 	return d(sm_dre);

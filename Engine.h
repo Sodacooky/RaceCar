@@ -53,17 +53,28 @@ public:
 	static void ClearBuff(void);
 
 	//从文件中加载graphunit，在需要被渲染时不要清理，不用时请记得清理
-	static GraphUnit* LoadUnit(const char* filename, bool use_key = false,
-							   SDL_Color key = { 0,255,0,255 });
+	static GraphUnit* LoadUnitFromFile(const char* filename, bool use_key = false,
+									   SDL_Color key = { 0,255,0,255 });
+
+	//从内存加载graphunit,在需要被渲染时不要清理，不用时请记得清理
+	static GraphUnit* LoadUnitFromMem(void* mem, unsigned int mem_size,
+									  bool use_key = false,
+									  SDL_Color key = { 0,255,0,255 });
 
 	//将一个字符串转换为GraphUnit
 	//第一个参数返回一个等比的绘制大小，高为16
-	static GraphUnit* FontsToUnit(SDL_Point* size, const char* ansi_cstr);
+	static GraphUnit* StringToUnit(SDL_Point* size, const char* ansi_cstr);
 
 	//从文件中加载graphunit，在需要被渲染时不要清理，不用时请记得清理
 	//这个文件被切分成16长的小正方形按顺序存放
-	static GraphUnitPack* LoadUnitPack(const char* filename, bool use_key = false,
-									   SDL_Color key = { 0,255,0,255 });
+	static GraphUnitPack* LoadSqUnitPackFromFile(const char* filename, bool use_key = false,
+												 SDL_Color key = { 0,255,0,255 });
+
+	//从内存中加载graphunit，在需要被渲染时不要清理，不用时请记得清理
+	//这个文件被切分成16长的小正方形按顺序存放
+	static GraphUnitPack* LoadSqUnitPackFromMem(void* mem, unsigned int mem_size,
+												bool use_key = false,
+												SDL_Color key = { 0,255,0,255 });
 
 	static void FreeUnit(GraphUnit* gu);
 
@@ -98,7 +109,7 @@ class RandomEngine
 {
 public:
 	static void Init();
-	static int Uniform(int min, int max);
+	static int UniformRange(int min, int max);
 	static bool Half();
 	//使用sdl的gettick重新设置，如果sdl未初始化可能会有问题
 	static void SetNewSeed();

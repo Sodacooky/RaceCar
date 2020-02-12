@@ -17,14 +17,15 @@
 
 #include "SDL/SDL.h"
 #include "SDL/SDL_ttf.h"
+#include "SDL/SDL_mixer.h"
 #include "Engine.h"
 // 添加要在此处预编译的标头
 
 #pragma comment (lib,"SDL/SDL2.lib")
 #pragma comment (lib,"SDL/SDL2main.lib")
 #pragma comment (lib,"SDL/SDL2_ttf.lib")
+#pragma comment (lib,"SDL/SDL2_mixer.lib")
 //#pragma comment (lib,"SDL/SDL2test.lib")
-//#pragma comment (lib,"SDL/SDL2_mixer.lib")
 //#undef main
 //#pragma comment( linker, "/subsystem:windows /entry:mainCRTStartup" )
 

@@ -55,15 +55,17 @@ bool Game::__Init()
 
 	GraphEngine::ChangeWinTitle(u8"迫真赛车");
 	GraphEngine::ChangeWinSize(3);
-	sm_pgupTex = GraphEngine::LoadUnitPack("Res/texture.bmp", true, { 255,255,255,255 });
+	sm_pgupTex = GraphEngine::LoadSqUnitPackFromFile("Res/texture.bmp", true, { 255,255,255,255 });
 	return true;
 }
 
 int Game::__StartPage()
 {
-	auto start_pgu = GraphEngine::LoadUnit("Res/startpage_start_gb.bmp", true);
-	auto quit_pgu = GraphEngine::LoadUnit("Res/startpage_quit_gb.bmp", true);
-	auto cursor_pgu = GraphEngine::LoadUnit("Res/cursor_gb.bmp", true);
+	auto cursor_pgu = GraphEngine::LoadUnitFromFile("Res/cursor_gb.bmp", true);
+	SDL_Point start_size;
+	auto start_pgu = GraphEngine::StringToUnit(&start_size, "Start");
+	SDL_Point quit_size;
+	auto quit_pgu = GraphEngine::StringToUnit(&quit_size, "Quit");
 
 	int nowSelecting = 0;
 
@@ -72,8 +74,8 @@ int Game::__StartPage()
 	{
 		GraphEngine::ClearBuff();
 
-		GraphEngine::AddToBuff(96, 128, 64, 16, start_pgu);
-		GraphEngine::AddToBuff(96, 144, 64, 16, quit_pgu);
+		GraphEngine::AddToBuff(96, 128, start_size.x, 16, start_pgu);
+		GraphEngine::AddToBuff(96, 144, quit_size.x, 16, quit_pgu);
 		GraphEngine::AddToBuff(80, 128 + nowSelecting * 16, 16, 16, cursor_pgu);
 
 		SDL_PollEvent(&sm_msg);
@@ -212,7 +214,7 @@ void Game::__UpdateBackground()
 			{
 				tmpPos = { x,y };
 				__PosToString(tmpStr, tmpPos);
-				sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(10, 19);
+				sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(10, 19);
 			}
 		}
 		//更新两边的草
@@ -222,7 +224,7 @@ void Game::__UpdateBackground()
 			{
 				tmpPos = { x,y };
 				__PosToString(tmpStr, tmpPos);
-				sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+				sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 			}
 		}
 		for (int x = 14; x <= 15; x++)
@@ -231,7 +233,7 @@ void Game::__UpdateBackground()
 			{
 				tmpPos = { x,y };
 				__PosToString(tmpStr, tmpPos);
-				sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+				sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 			}
 		}
 	}
@@ -266,16 +268,16 @@ void Game::__UpdateBackground()
 		//随机生成新的草
 		tmpPos = { 0,0 };
 		__PosToString(tmpStr, tmpPos);
-		sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+		sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 		tmpPos = { 1,0 };
 		__PosToString(tmpStr, tmpPos);
-		sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+		sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 		tmpPos = { 14,0 };
 		__PosToString(tmpStr, tmpPos);
-		sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+		sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 		tmpPos = { 15,0 };
 		__PosToString(tmpStr, tmpPos);
-		sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(0, 9);
+		sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(0, 9);
 
 		//旧公路块向下移动
 		for (int x = 2; x <= 13; x++)
@@ -294,7 +296,7 @@ void Game::__UpdateBackground()
 		{
 			tmpPos = { x,0 };
 			__PosToString(tmpStr, tmpPos);
-			sm_map_strPos_nTexId[tmpStr] = RandomEngine::Uniform(10, 19);
+			sm_map_strPos_nTexId[tmpStr] = RandomEngine::UniformRange(10, 19);
 		}
 	}
 }
@@ -316,10 +318,10 @@ void Game::__GenerateOnRoadCar()
 		}
 		while (delta > 0)
 		{
-			if (RandomEngine::Uniform(0, 9) > 8)
+			if (RandomEngine::UniformRange(0, 9) > 8)
 			{
 				bool isSameBlock = false;
-				int tmpX = RandomEngine::Uniform(2, 13);
+				int tmpX = RandomEngine::UniformRange(2, 13);
 				//排除重复位置
 				for (auto iter = sm_vec_car.end() - 1; iter != sm_vec_car.begin(); iter--)
 				{
@@ -333,7 +335,7 @@ void Game::__GenerateOnRoadCar()
 				{
 					sm_vec_car.push_back(car);
 					(*(sm_vec_car.end() - 1)).MoveTo(tmpX, 0);
-					(*(sm_vec_car.end() - 1)).SetTexId(RandomEngine::Uniform(21, 29));
+					(*(sm_vec_car.end() - 1)).SetTexId(RandomEngine::UniformRange(21, 29));
 				}
 			}
 			if (sm_vec_car.size() >= 150)
@@ -467,18 +469,18 @@ Uint32 Game::__CycleCB(Uint32 interval, void* praram)
 
 int Game::__EndPage()
 {
-	auto again_pgu = GraphEngine::LoadUnit("Res/endpage_again_gb.bmp", true);
-	auto quit_pgu = GraphEngine::LoadUnit("Res/endpage_quit_gb.bmp", true);
-	auto cursor_pgu = GraphEngine::LoadUnit("Res/cursor_gb.bmp", true);
+	SDL_Point again_size;
+	auto again_pgu = GraphEngine::StringToUnit(&again_size, "Retry");
+	SDL_Point quit_size;
+	auto quit_pgu = GraphEngine::StringToUnit(&quit_size, "Quit");
+	auto cursor_pgu = GraphEngine::LoadUnitFromFile("Res/cursor_gb.bmp", true);
 
 	SDL_Point text_size;
-	std::string scoreText = "你的分数是: ";
+	std::string scoreText = "Your score: ";
 	std::string scoreNum;
 	__IntToString(scoreNum, sm_unScore);
 	scoreText += scoreNum;
-	auto text_pgu = GraphEngine::FontsToUnit(&text_size, scoreText.c_str());
-	std::cout << SDL_GetError() << std::endl
-		<< TTF_GetError() << std::endl;
+	auto text_pgu = GraphEngine::StringToUnit(&text_size, scoreText.c_str());
 
 	int nowSelecting = 0;
 
@@ -487,8 +489,8 @@ int Game::__EndPage()
 	{
 		GraphEngine::ClearBuff();
 
-		GraphEngine::AddToBuff(96, 128, 64, 16, again_pgu);
-		GraphEngine::AddToBuff(96, 144, 64, 16, quit_pgu);
+		GraphEngine::AddToBuff(96, 128, again_size.x, 16, again_pgu);
+		GraphEngine::AddToBuff(96, 144, quit_size.x, 16, quit_pgu);
 		GraphEngine::AddToBuff(80, 128 + nowSelecting * 16, 16, 16, cursor_pgu);
 		GraphEngine::AddToBuff(0, 0, text_size.x, text_size.y, text_pgu);
 
