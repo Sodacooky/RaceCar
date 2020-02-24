@@ -126,7 +126,7 @@ int Game::__StartPage()
 					GraphEngine::FreeUnit(start_pgu);
 					GraphEngine::FreeUnit(quit_pgu);
 					GraphEngine::FreeUnit(cursor_pgu);
-					return nowSelecting;
+					break;
 				}
 
 				if (nowSelecting >= 2)
@@ -143,7 +143,11 @@ int Game::__StartPage()
 		GraphEngine::PresentBuff();
 	}
 
-	return -1;
+	GraphEngine::FreeUnit(cursor_pgu);
+	GraphEngine::FreeUnit(start_pgu);
+	GraphEngine::FreeUnit(quit_pgu);
+	AudioEngine::FreeSEAudio(sound);
+	return nowSelecting;
 }
 
 int Game::__InRace()
@@ -584,6 +588,10 @@ int Game::__EndPage()
 	}
 
 	AudioEngine::StopBGM();
+	AudioEngine::FreeSEAudio(sound);
+	GraphEngine::FreeUnit(cursor_pgu);
+	GraphEngine::FreeUnit(quit_pgu);
+	GraphEngine::FreeUnit(again_pgu);
 	return nowSelecting;
 }
 
