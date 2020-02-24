@@ -1,23 +1,18 @@
-/*
-iostream
-vector
-random
-windows
-sdl
-sdl_ttf
-sdl_mixer
-*/
 #include "pch.h"
 #include "Engine.h"
 
-//GraphEngine
+/////////////GraphEngine////////////////
 SDL_Window* GraphEngine::sm_pWin = nullptr;
 SDL_Renderer* GraphEngine::sm_pRen = nullptr;
 TTF_Font* GraphEngine::sm_pFont;
 int GraphEngine::sm_nWinSizeTimes = 2;
 std::vector<GraphEngine::InBuffGraphUnit> GraphEngine::sm_vec_ibguBuff;
-//RandomEngine
+///////////////RandomEngine////////////////
 std::default_random_engine RandomEngine::sm_dre;
+/////////////AudioEngine///////////////////
+Mix_Music* AudioEngine::sm_pMusBGM;
+int AudioEngine::sm_nBGMVolume;
+bool AudioEngine::sm_bChannelUsed[64];
 
 bool GraphEngine::Init(void)
 {
@@ -67,6 +62,14 @@ bool GraphEngine::Init(void)
 	}
 	//done
 	return true;
+}
+
+void GraphEngine::Quit()
+{
+	SDL_DestroyRenderer(sm_pRen);
+	SDL_DestroyWindow(sm_pWin);
+	SDL_Quit();
+	ClearBuff();
 }
 
 void GraphEngine::ChangeWinSize(int times)
@@ -274,7 +277,7 @@ GraphUnitPack* GraphEngine::LoadSqUnitPackFromFile(const char* filename, bool us
 	SDL_Surface* sur = SDL_LoadBMP(filename);
 	if (sur == nullptr)
 	{
-		std::cout << "LoadSqUnitPackFromFile() couldn;t load file: "
+		std::cout << "LoadSqUnitPackFromFile() couldn't load file: "
 			<< SDL_GetError() << std::endl;
 		return nullptr;
 	}
@@ -441,6 +444,12 @@ int RandomEngine::UniformRange(int min, int max)
 	return d(sm_dre);
 }
 
+int RandomEngine::NormalRange(int mu, int sigma)
+{
+	std::normal_distribution<>d(mu, sigma);
+	return static_cast<int>(d(sm_dre));
+}
+
 bool RandomEngine::Half()
 {
 	std::uniform_int_distribution<int> d(0, 1);
@@ -462,4 +471,263 @@ void RandomEngine::SetNewSeed()
 void RandomEngine::SetNewSeed(unsigned int seed)
 {
 	sm_dre.seed(seed);
+}
+
+bool AudioEngine::Init()
+{
+	if (Mix_Init(MIX_INIT_OGG | MIX_INIT_MID) == 0)
+	{
+		return false;
+	}
+	//不知道下面的错误是什么
+	Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096);
+	Mix_AllocateChannels(8);
+	return false;
+}
+
+void AudioEngine::Quit()
+{
+	Mix_AllocateChannels(0);
+	Mix_FreeMusic(sm_pMusBGM);
+	Mix_CloseAudio();
+	Mix_Quit();
+}
+
+void AudioEngine::PlayBGM(int fade_ms)
+{
+	Mix_PlayMusic(sm_pMusBGM, 0);
+}
+
+void AudioEngine::RewindBGM()
+{
+	Mix_RewindMusic();
+}
+
+void AudioEngine::StopBGM(int fade_ms)
+{
+	Mix_FadeOutMusic(fade_ms);
+}
+
+void AudioEngine::PauseBGM(void)
+{
+	Mix_PauseMusic();
+}
+
+void AudioEngine::ResumeBGM()
+{
+	Mix_ResumeMusic();
+}
+
+void AudioEngine::LoadBGMFromFile(const char* filename)
+{
+	//del old one
+	if (sm_pMusBGM != nullptr)
+	{
+		Mix_FreeMusic(sm_pMusBGM);
+	}
+
+	//load new one
+	sm_pMusBGM = Mix_LoadMUS(filename);
+	if (sm_pMusBGM == nullptr)
+	{
+		std::cout << "LoadBGMFromFile() couldn't load music from file." << std::endl;
+	}
+}
+
+void AudioEngine::LoadBGMFromMem(void* mem, unsigned int size)
+{
+	auto rw = SDL_RWFromMem(mem, size);
+	if (rw == nullptr)
+	{
+		std::cout << "LoadBGMFromMem() couldn't load rwops from mem." << std::endl;
+		return;
+	}
+	sm_pMusBGM = Mix_LoadMUS_RW(rw, 1);//free rw
+	if (sm_pMusBGM == nullptr)
+	{
+		std::cout << "LoadBGMFromMem() couldn't load music from rwops." << std::endl;
+		return;//?
+	}
+}
+
+void AudioEngine::BGMVolume(int new_volume)
+{
+	if (new_volume < 0 || new_volume>128)
+	{
+		std::cout << "BGMVolume() new volume out of range.It have been set to 64." << std::endl;
+		Mix_VolumeMusic(64);
+		sm_nBGMVolume = 64;
+	}
+	else
+	{
+		Mix_VolumeMusic(new_volume);
+		sm_nBGMVolume = new_volume;
+	}
+}
+
+int AudioEngine::BGMVolume()
+{
+	return sm_nBGMVolume;
+}
+
+void AudioEngine::SetFinishedBGMCB(void(*cb)())
+{
+	Mix_HookMusicFinished(cb);
+}
+
+SEAudio* AudioEngine::LoadSEAudioFromFile(const char* filename)
+{
+	Mix_Chunk* pChunk = Mix_LoadWAV(filename);
+	if (pChunk == nullptr)
+	{
+		std::cout << "LoadSEAudioFromFile() couldn't load from file." << std::endl;
+		return new SEAudio(nullptr, 0);
+	}
+
+	int freeChannel = __FindEmptyChannel();
+	if (freeChannel == -1)
+	{
+		std::cout << "LoadSEAudioFromFile() could't find free channel." << std::endl;
+		Mix_FreeChunk(pChunk);
+		return new SEAudio(nullptr, 0);
+	}
+
+	auto obj = new SEAudio(pChunk, freeChannel);
+	if (obj == nullptr)
+	{
+		std::cout << "LoadSEAudioFromFile() could't allocate mem for seaudio." << std::endl;
+		Mix_FreeChunk(pChunk);
+		return new SEAudio(nullptr, 0);
+	}
+
+	return obj;
+}
+
+SEAudio* AudioEngine::LoadSEAudioFromMem(void* mem, unsigned int size)
+{
+	auto rw = SDL_RWFromMem(mem, size);
+	if (rw == nullptr)
+	{
+		std::cout << "LoadSEAudioFromFile() couldn't load from mem." << std::endl;
+		return new SEAudio(nullptr, 0);
+	}
+
+	Mix_Chunk* pChunk = Mix_LoadWAV_RW(rw, 1);//free rw
+	if (pChunk == nullptr)
+	{
+		std::cout << "LoadSEAudioFromFile() couldn't load from rw." << std::endl;
+		return new SEAudio(nullptr, 0);
+	}
+
+	int freeChannel = __FindEmptyChannel();
+	if (freeChannel == -1)
+	{
+		std::cout << "LoadSEAudioFromFile() could't find free channel." << std::endl;
+		Mix_FreeChunk(pChunk);
+		return new SEAudio(nullptr, 0);
+	}
+
+	auto obj = new SEAudio(pChunk, freeChannel);
+	if (obj == nullptr)
+	{
+		std::cout << "LoadSEAudioFromFile() could't allocate mem for seaudio." << std::endl;
+		Mix_FreeChunk(pChunk);
+		return new SEAudio(nullptr, 0);
+	}
+
+	return obj;
+}
+
+void AudioEngine::FreeSEAudio(SEAudio* se)
+{
+	sm_bChannelUsed[se->GetChannel()] = false;
+	se->FreeChunk();
+	delete se;
+	se = nullptr;
+}
+
+void AudioEngine::StopAllSEAudio()
+{
+	Mix_HaltChannel(-1);
+}
+
+int AudioEngine::__FindEmptyChannel()
+{
+	int freeChannel = -1;
+	for (int i = 0; i != 64; i++)
+	{
+	}
+	return 0;
+}
+
+SEAudio::SEAudio(Mix_Chunk* pChunk, int channel)
+{
+	m_nChannel = channel;
+	m_nPosAngle = 0;
+	m_nPosDistance = 0;
+	m_pChunk = pChunk;
+	//SetPosition(m_nPosAngle,m_nPosDistance);
+}
+
+void SEAudio::Play()
+{
+	if (m_pChunk != nullptr)
+	{
+		if (!Mix_Playing(m_nChannel))
+		{
+			Mix_PlayChannel(m_nChannel, m_pChunk, 0);
+		}
+	}
+	else
+	{
+		std::cout << "SEAudio::Play() m_pChunk is null pointer." << std::endl;
+	}
+}
+
+void SEAudio::Pause()
+{
+	Mix_Pause(m_nChannel);
+}
+
+void SEAudio::Resume()
+{
+	Mix_Resume(m_nChannel);
+}
+
+void SEAudio::Stop()
+{
+	Mix_HaltChannel(m_nChannel);
+}
+
+void SEAudio::SetPosition(int angle, int distance)
+{
+	Mix_SetPosition(m_nChannel, angle, distance);
+	m_nPosAngle = angle;
+	m_nPosDistance = distance;
+}
+
+int SEAudio::GetPositionAngle()
+{
+	return m_nPosAngle;
+}
+
+int SEAudio::GetPositionDistance()
+{
+	return m_nPosDistance;
+}
+
+int SEAudio::GetChannel()
+{
+	return m_nChannel;
+}
+
+void SEAudio::SetFinishedCB(void(*cb)(int channel_useless))
+{
+	Mix_ChannelFinished(cb);
+}
+
+void SEAudio::FreeChunk()
+{
+	Mix_FreeChunk(m_pChunk);
+	m_pChunk = nullptr;
 }

@@ -70,6 +70,8 @@ private:
 	//背后按周期运行的生成和移动路上的车子
 	//sdl timer callback
 	static Uint32 __CycleCB(Uint32 interval, void* praram);
+	//
+	static void __FinshedBGMCB();
 
 	//结算界面
 	static int __EndPage();

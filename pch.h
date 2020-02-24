@@ -13,13 +13,18 @@
 #include <map>
 #include <random>
 #include <sstream>
+#include <functional>
+
+#include <iostream>
+#include <vector>
+#include <random>
 #include <Windows.h>
 
 #include "SDL/SDL.h"
-#include "SDL/SDL_ttf.h"
 #include "SDL/SDL_mixer.h"
+#include "SDL/SDL_ttf.h"
+
 #include "Engine.h"
-// 添加要在此处预编译的标头
 
 #pragma comment (lib,"SDL/SDL2.lib")
 #pragma comment (lib,"SDL/SDL2main.lib")
@@ -28,5 +33,6 @@
 //#pragma comment (lib,"SDL/SDL2test.lib")
 //#undef main
 //#pragma comment( linker, "/subsystem:windows /entry:mainCRTStartup" )
+// 添加要在此处预编译的标头
 
 #endif //PCH_H

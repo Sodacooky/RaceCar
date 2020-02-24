@@ -56,6 +56,8 @@ bool Game::__Init()
 	GraphEngine::ChangeWinTitle(u8"ÆÈÕæÈü³µ");
 	GraphEngine::ChangeWinSize(3);
 	sm_pgupTex = GraphEngine::LoadSqUnitPackFromFile("Res/texture.bmp", true, { 255,255,255,255 });
+
+	AudioEngine::Init();
 	return true;
 }
 
@@ -66,6 +68,8 @@ int Game::__StartPage()
 	auto start_pgu = GraphEngine::StringToUnit(&start_size, "Start");
 	SDL_Point quit_size;
 	auto quit_pgu = GraphEngine::StringToUnit(&quit_size, "Quit");
+
+	auto sound = AudioEngine::LoadSEAudioFromFile("Res/button.wav");
 
 	int nowSelecting = 0;
 
@@ -108,14 +112,17 @@ int Game::__StartPage()
 				{
 					nowSelecting++;
 					keyholding = true;
+					sound->Play();
 				}
 				else if (sm_msg.key.keysym.sym == SDLK_UP)
 				{
 					nowSelecting--;
 					keyholding = true;
+					sound->Play();
 				}
 				else if (sm_msg.key.keysym.sym == SDLK_RETURN)
 				{
+					sound->Play();
 					GraphEngine::FreeUnit(start_pgu);
 					GraphEngine::FreeUnit(quit_pgu);
 					GraphEngine::FreeUnit(cursor_pgu);
@@ -150,6 +157,13 @@ int Game::__InRace()
 
 	auto timer = SDL_AddTimer(250, __CycleCB, nullptr);
 
+	AudioEngine::LoadBGMFromFile("Res/ingame.ogg");
+	AudioEngine::PlayBGM();
+	AudioEngine::BGMVolume(100);
+	AudioEngine::SetFinishedBGMCB(__FinshedBGMCB);
+
+	auto crash = AudioEngine::LoadSEAudioFromFile("Res/crash.wav");
+
 	while (true)
 	{
 		GraphEngine::ClearBuff();
@@ -161,6 +175,7 @@ int Game::__InRace()
 
 		if (__IsThereCollision())
 		{
+			crash->Play();
 			break;
 		}
 		sm_unScore += 1;
@@ -175,8 +190,12 @@ int Game::__InRace()
 		__ControlPlayerCar();
 	}
 
+	SDL_Delay(500);
 	SDL_RemoveTimer(timer);
 	sm_map_strPos_nTexId.clear();
+	AudioEngine::SetFinishedBGMCB();
+	AudioEngine::FreeSEAudio(crash);
+	AudioEngine::StopBGM();
 	return 	0;
 }
 
@@ -467,6 +486,11 @@ Uint32 Game::__CycleCB(Uint32 interval, void* praram)
 	}
 }
 
+void Game::__FinshedBGMCB()
+{
+	AudioEngine::PlayBGM();
+}
+
 int Game::__EndPage()
 {
 	SDL_Point again_size;
@@ -474,6 +498,11 @@ int Game::__EndPage()
 	SDL_Point quit_size;
 	auto quit_pgu = GraphEngine::StringToUnit(&quit_size, "Quit");
 	auto cursor_pgu = GraphEngine::LoadUnitFromFile("Res/cursor_gb.bmp", true);
+
+	auto sound = AudioEngine::LoadSEAudioFromFile("Res/button.wav");
+	AudioEngine::LoadBGMFromFile("Res/fail.ogg");
+	AudioEngine::PlayBGM(500);
+	AudioEngine::BGMVolume(64);
 
 	SDL_Point text_size;
 	std::string scoreText = "Your score: ";
@@ -523,18 +552,21 @@ int Game::__EndPage()
 				{
 					nowSelecting++;
 					keyholding = true;
+					sound->Play();
 				}
 				else if (sm_msg.key.keysym.sym == SDLK_UP)
 				{
 					nowSelecting--;
 					keyholding = true;
+					sound->Play();
 				}
 				else if (sm_msg.key.keysym.sym == SDLK_RETURN)
 				{
+					sound->Play();
 					GraphEngine::FreeUnit(again_pgu);
 					GraphEngine::FreeUnit(quit_pgu);
 					GraphEngine::FreeUnit(cursor_pgu);
-					return nowSelecting;
+					break;
 				}
 
 				if (nowSelecting >= 2)
@@ -551,7 +583,8 @@ int Game::__EndPage()
 		GraphEngine::PresentBuff();
 	}
 
-	return -1;
+	AudioEngine::StopBGM();
+	return nowSelecting;
 }
 
 void Game::__StringToPos(const char* cstr, SDL_Point& ptPos)
